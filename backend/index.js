@@ -9,23 +9,26 @@ dotenv.config();
 
 const app = express();
 
+// CORS (near the top, before routes)
 const ALLOWED_ORIGINS = [
   process.env.CLIENT_ORIGIN || "http://localhost:5173",
+  // add your prod frontend later, e.g. "https://your-frontend.netlify.app"
 ];
 
 const corsOptions = {
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    return cb(new Error("Not allowed by CORS"));
+    if (!origin) return cb(null, true); // server-to-server or curl/Postman
+    return ALLOWED_ORIGINS.includes(origin)
+      ? cb(null, true)
+      : cb(new Error("Not allowed by CORS"));
   },
   methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  // <-- remove allowedHeaders to let cors mirror request headers
   optionsSuccessStatus: 204,
 };
 
 app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
+// <-- remove the explicit app.options(...) line
 
 app.use(express.json());
 
@@ -59,13 +62,22 @@ const transporter = nodemailer.createTransport({
   auth: { user: smtpUser, pass: smtpPass },
 });
 
-app.get("/health", (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
+app.get("/health", (_req, res) =>
+  res.json({ ok: true, uptime: process.uptime() })
+);
 
 app.post("/api/mail/send", async (req, res) => {
   try {
     const { subject, body, recipients } = req.body || {};
-    if (!subject || !body || !Array.isArray(recipients) || recipients.length === 0) {
-      return res.status(400).json({ message: "Subject, body, and recipients[] are required." });
+    if (
+      !subject ||
+      !body ||
+      !Array.isArray(recipients) ||
+      recipients.length === 0
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Subject, body, and recipients[] are required." });
     }
 
     const info = await transporter.sendMail({
@@ -89,7 +101,9 @@ app.post("/api/mail/send", async (req, res) => {
         error: String(e?.message || e),
       });
     } catch {}
-    return res.status(500).json({ ok: false, message: "Failed to send emails." });
+    return res
+      .status(500)
+      .json({ ok: false, message: "Failed to send emails." });
   }
 });
 
@@ -104,4 +118,6 @@ app.use((err, _req, res, _next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Bulk Mail API running at http://localhost:${PORT}`));
+app.listen(PORT, () =>
+  console.log(`Bulk Mail API running at http://localhost:${PORT}`)
+);
